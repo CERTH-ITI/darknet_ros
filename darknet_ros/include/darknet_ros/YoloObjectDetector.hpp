@@ -198,7 +198,7 @@ class YoloObjectDetector {
   int fullScreen_;
   char* demoPrefix_;
 
-  std_msgs::Header imageHeader_;
+  std_msgs::Header imageHeader_, my_header;
   cv::Mat camImageCopy_;
   boost::shared_mutex mutexImageCallback_;
 

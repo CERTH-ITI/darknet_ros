@@ -165,7 +165,6 @@ void YoloObjectDetector::init() {
 //Func 3 <~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~CAMERA CALLBACK~
 void YoloObjectDetector::cameraCallback(const sensor_msgs::ImageConstPtr& msg) {
   ROS_DEBUG("[YoloObjectDetector] USB image received.");
-
   cv_bridge::CvImagePtr cam_image;
 
   try {
@@ -175,11 +174,18 @@ void YoloObjectDetector::cameraCallback(const sensor_msgs::ImageConstPtr& msg) {
     return;
   }
 
+  if (cam_image)
+  {
+    my_header = msg->header;
+    camImageCopy_ = cam_image->image.clone();
+    imageStatus_ = true;
+  }
+
   if (cam_image) {
     {
       boost::unique_lock<boost::shared_mutex> lockImageCallback(mutexImageCallback_);
-      imageHeader_ = msg->header;
-      camImageCopy_ = cam_image->image.clone();
+      imageHeader_ = imageHeader_;
+      //camImageCopy_ = cam_image->image.clone();
 
       // std::cout<<"\nFrame number : "<<input_frame_number;
       // input_frame_number++;
@@ -192,7 +198,7 @@ void YoloObjectDetector::cameraCallback(const sensor_msgs::ImageConstPtr& msg) {
     }
     {
       boost::unique_lock<boost::shared_mutex> lockImageStatus(mutexImageStatus_);
-      imageStatus_ = true;
+      //imageStatus_ = true;
     }
     frameWidth_ = cam_image->image.size().width;
     frameHeight_ = cam_image->image.size().height;
@@ -250,7 +256,7 @@ bool YoloObjectDetector::isCheckingForObjects() const {
 bool YoloObjectDetector::publishDetectionImage(const cv::Mat& detectionImage) {
   if (detectionImagePublisher_.getNumSubscribers() < 1) return false;
   cv_bridge::CvImage cvImage;
-  cvImage.header.stamp = imageHeader_.stamp;
+  cvImage.header.stamp = my_header.stamp;
   cvImage.header.frame_id = "detection_image";
   cvImage.encoding = sensor_msgs::image_encodings::BGR8;
   cvImage.image = detectionImage;
@@ -554,7 +560,7 @@ void YoloObjectDetector::yolo() {
 // ****
 IplImageWithHeader_ YoloObjectDetector::getIplImageWithHeader() {
   IplImage* ROS_img = new IplImage(camImageCopy_);
-  IplImageWithHeader_ header = {.image = ROS_img, .header = imageHeader_};
+  IplImageWithHeader_ header = {.image = ROS_img, .header = my_header};
   return header;
 }
 
@@ -592,7 +598,7 @@ void* YoloObjectDetector::publishInThread() {
     }
     
     darknet_ros_msgs::ObjectCount msg;
-    msg.header.stamp =  imageHeader_.stamp;
+    msg.header.stamp =  my_header.stamp;
     msg.header.frame_id = "detection";
     msg.count = num;
     objectPublisher_.publish(msg);
@@ -619,14 +625,14 @@ void* YoloObjectDetector::publishInThread() {
       }
     }
     boundingBoxesResults_.header.frame_id = "detection";
-    boundingBoxesResults_.image_header = imageHeader_;
-    boundingBoxesResults_.image_header.stamp = imageHeader_.stamp;
+    boundingBoxesResults_.image_header = my_header;
+    boundingBoxesResults_.image_header.stamp = my_header.stamp;
     boundingBoxesResults_.header.stamp = boundingBoxesResults_.image_header.stamp;
     boundingBoxesPublisher_.publish(boundingBoxesResults_);
 
   } else {
     darknet_ros_msgs::ObjectCount msg;
-    msg.header.stamp =  imageHeader_.stamp;
+    msg.header.stamp =  my_header.stamp;
     msg.header.frame_id = "detection";
     msg.count = 0;
     objectPublisher_.publish(msg);
